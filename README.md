@@ -1,6 +1,6 @@
-# Data Flow Analysis - OnlineEditor
+# Data Flow Analysis - OnlineEditor with Mitigation
 
-This repository contains both the Analysis Backend Server and the Frontend Online Editor.
+This repository contains both the Analysis Backend Server and the Frontend Online Editor with the ARCoViA framework included.
 
 # Setup 
 ### Setup Frontend
@@ -13,11 +13,11 @@ git clone https://github.com/arcovia-dev/OnlineEditorWithMitigation.git
 cd OnlineEditorWithMitigation/frontend/webEditor
 npm install
 ```
-Now you need to change the Websocket Ip to the Ip of your server, or the local adress.
+Now you need to change the REST Ip to the Ip of your server, or the local address.
 
-This is done in Frontend/WebEditor/src/webSocket/webSocket.ts
+This is done in \frontend\webEditor\src\dfdApiClient\backendUrl.ts
 
-For local use: "ws://localhost:3000/events/"
+For local use edit \frontend\webEditor\vite.config.ts or leave it if the local backend address stays the same.
 
 ### Setup Backend With Mitigation
 
@@ -44,7 +44,7 @@ This will start a local web server. To visit the page, either open the URL shown
 
 Simply run main. Established connections are printed on the terminal.
 
-As standard the server will be deployed at `localhost:3000/events`
+As standard the server with REST API will be deployed at `localhost:3000/api/`
 
 # Building for production
 ### Building Frontend
@@ -62,7 +62,7 @@ This will create a `dist` folder containing the built static assets. The content
 Set the target platform for Mitigation as active.
 Then export deployable Plug-Ins and Fragments for The SMT, SAT, ILP and ranking packages.
 
-Add the plugin folder to the target platform of the analysisBackendServer, set it as active and export the analysisBackendServer plugin.
+Add the plugin folder to the target platform of the analysisBackendServer, set it as active and export the analysisBackendServer standalone plugin.
 
 To build an executable jar for the backend clone `https://github.com/DataFlowAnalysis/AnalysisBackendServerProduct`, add the plugin folder containing both the mitigation and analysisBackendServer plugins to the target platform, and run `mvn clean verify -Dtycho.localArtifacts=ignore`
 
