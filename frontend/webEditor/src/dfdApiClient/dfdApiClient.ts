@@ -1,11 +1,15 @@
 import { inject, injectable } from "inversify";
 import { FileName } from "../fileName/fileName";
+import { BackEndURL } from "./backendUrl";
 
 @injectable()
 export class DfdApiClient {
     mitigationSeperator: string = ":MITIGATION_META_INFO:";
 
-    constructor(@inject(FileName) private readonly fileName: FileName) {}
+    constructor(
+        @inject(FileName) private readonly fileName: FileName,
+        @inject(BackEndURL) private readonly backEndURL: BackEndURL,
+    ) {}
 
     public async requestDiagram(message: string, action: string) {
         try {
@@ -34,7 +38,7 @@ export class DfdApiClient {
     }
 
     public sendMessage(message: string, action: string): Promise<string> {
-        const apiUrl = `/api/${action}`;
+        const apiUrl = `${this.backEndURL.get()}${action}`;
 
         return fetch(apiUrl, {
             method: "POST",

@@ -20,8 +20,13 @@ import dev.arcovia.mitigation.sat.IncomingDataLabel;
 
 public class ILPService extends MitigationService{
     protected DataFlowDiagramAndDictionary repair(DataFlowDiagramAndDictionary dd, List<AnalysisConstraint> constraints, List<MitigationOption> options) throws Exception {
-        var cons = convertMitigationToConstraints(options, constraints);
-        var optimization = new OptimizationManager(dd, cons, false);
+        OptimizationManager optimization;
+        if (!options.isEmpty()) {
+            var cons = convertMitigationToConstraints(options, constraints);
+            optimization = new OptimizationManager(dd, cons, false);
+        } else {
+            optimization = new OptimizationManager(dd, constraints);
+        }
         return optimization.repair();
     }
     
