@@ -13,9 +13,7 @@ git clone https://github.com/arcovia-dev/OnlineEditorWithMitigation.git
 cd OnlineEditorWithMitigation/frontend/webEditor
 npm install
 ```
-Now you need to change the REST Ip to the Ip of your server, or the local address.
-
-This is done in \frontend\webEditor\src\dfdApiClient\backendUrl.ts
+Now you might need to change the IP for the REST API to the Ip of your server, or the local address.
 
 For local use edit \frontend\webEditor\vite.config.ts or leave it if the local backend address stays the same.
 
@@ -48,6 +46,8 @@ As standard the server with REST API will be deployed at `localhost:3000/api/`
 
 # Building for production
 ### Building Frontend
+
+Set the IP for the REST API in \frontend\webEditor\src\dfdApiClient\backendUrl.ts
 
 To build the project for production run the following command:
 
