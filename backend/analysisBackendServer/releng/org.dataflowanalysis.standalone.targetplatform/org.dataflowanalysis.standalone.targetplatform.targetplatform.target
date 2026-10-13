@@ -38,7 +38,8 @@
 		</location>
 		<location includeAllPlatforms="false" includeConfigurePhase="true" includeMode="planner" includeSource="false" type="InstallableUnit">
 			<unit id="tools.mdsd.modelingfoundations.identifier.feature.feature.group" version="0.0.0"/>
-			<repository location="https://updatesite.mdsd.tools/metamodel-modeling-foundations/nightly/"/>
+			<unit id="tools.mdsd.modelingfoundations.identifier.ui.feature.feature.group" version="0.0.0"/>
+			<repository location="https://updatesite.mdsd.tools/metamodel-modeling-foundations/releases/1.0.0/"/>
 		</location>
 		<location includeAllPlatforms="false" includeConfigurePhase="true" includeMode="planner" includeSource="false" type="InstallableUnit">
 			<unit id="org.dataflowanalysis.pcm.extension.dictionary.characterized" version="0.0.0"/>
