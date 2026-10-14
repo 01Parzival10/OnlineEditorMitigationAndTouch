@@ -11,6 +11,7 @@
         "@eslint/eslintrc": "^3.3.5",
         "@eslint/js": "^10.0.1",
         "@fortawesome/fontawesome-free": "^7.2.0",
+        "@playwright/test": "^1.64.0",
         "@vscode/codicons": "^0.0.44",
         "eslint": "^10.0.2",
         "eslint-config-prettier": "^10.1.8",
@@ -39,7 +40,8 @@
         "postprepare": "npm run fetch-hash",
         "prebuild": "npm run fetch-hash",
         "predev": "npm run fetch-hash",
-        "fetch-hash": "node ./scripts/fetchHash.js"
+        "fetch-hash": "node ./scripts/fetchHash.js",
+        "test:touch": "playwright test"
     },
     "lint-staged": {
         "*.{html,css,ts,tsx,json}": [

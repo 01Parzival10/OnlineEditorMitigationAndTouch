@@ -4,7 +4,7 @@ import { LabelTypeEditorUi } from "./LabelTypeEditorUi";
 import { configureCommand, TYPES } from "sprotty";
 import { EDITOR_TYPES } from "../editorTypes";
 import { LabelAssignmentCommand } from "./assignmentCommand";
-import { DfdLabelMouseDropListener } from "./dragAndDrop";
+import { LabelPlacementTool } from "./labelPlacementTool";
 import { ReplaceCommand } from "./renameCommand";
 
 export const labelModule = new ContainerModule((bind, _, isBound) => {
@@ -17,5 +17,5 @@ export const labelModule = new ContainerModule((bind, _, isBound) => {
 
     configureCommand({ bind, isBound }, LabelAssignmentCommand);
     configureCommand({ bind, isBound }, ReplaceCommand);
-    bind(TYPES.MouseListener).to(DfdLabelMouseDropListener);
+    bind(LabelPlacementTool).toSelf().inSingletonScope();
 });

@@ -25,6 +25,8 @@ import { inject, injectable, multiInject } from "inversify";
 import { Action, Point, SEdge, SNode, SPort } from "sprotty-protocol";
 import { EDITOR_TYPES } from "../editorTypes";
 
+import { PlacementToolRegistry } from "../touch/placementTool";
+
 type Positionable = { position?: Point };
 type Schema = (SNode | SEdge | SPort) & Positionable;
 type Impl = SNodeImpl | SEdgeImpl | SPortImpl;
@@ -38,6 +40,8 @@ export type AnyCreationTool = CreationTool<Schema, Impl>;
  */
 @injectable()
 export abstract class CreationTool<S extends Schema, I extends Impl> extends MouseListener {
+    @inject(PlacementToolRegistry) protected placements!: PlacementToolRegistry;
+    private generation = 0;
     protected element?: I;
     protected readonly previewOpacity = 0.5;
     protected insertIntoGraphRootAfterCreation = true;
@@ -74,10 +78,18 @@ export abstract class CreationTool<S extends Schema, I extends Impl> extends Mou
     }
 
     enable(elementType: string): void {
+        this.placements.activate(this);
+        const generation = ++this.generation;
         this.elementType = elementType;
         this.mouseTool.register(this);
         this.createElement()
             .then((element) => {
+                if (generation !== this.generation) {
+                    const root = element.parent?.root;
+                    element.parent?.remove(element);
+                    if (root) this.commandStack.update(root);
+                    return;
+                }
                 this.element = element;
                 this.logger.log(this, "Created element", element);
 
@@ -92,6 +104,8 @@ export abstract class CreationTool<S extends Schema, I extends Impl> extends Mou
     }
 
     disable(): void {
+        this.generation++;
+        this.placements.deactivate(this);
         this.mouseTool.deregister(this);
 
         if (this.element) {

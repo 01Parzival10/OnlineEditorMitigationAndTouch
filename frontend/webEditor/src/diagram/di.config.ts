@@ -4,6 +4,7 @@ import {
     configureCommand,
     configureModelElement,
     EditLabelAction,
+    MoveMouseListener,
     EditLabelActionHandler,
     editLabelFeature,
     SGraphImpl,
@@ -44,7 +45,7 @@ export const diagramModule = new ContainerModule((bind, unbind, isBound, rebind)
     bind(TYPES.IUIExtension).toService(NoScrollEditLabelUI);
 
     bind(TYPES.ISnapper).to(PortAwareSnapper).inSingletonScope();
-    bind(TYPES.MouseListener).to(AlwaysSnapPortsMoveMouseListener).inSingletonScope();
+    rebind(MoveMouseListener).to(AlwaysSnapPortsMoveMouseListener).inSingletonScope();
     configureCommand(context, ReSnapPortsAfterLabelChangeCommand);
 
     bind(DfdNodeAnnotationUI).toSelf().inSingletonScope();

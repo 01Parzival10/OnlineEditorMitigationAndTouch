@@ -7,6 +7,7 @@ import {
     ICommand,
     SelectCommand,
     SetViewportCommand,
+    SetUIExtensionVisibilityCommand,
 } from "sprotty";
 
 /**
@@ -25,6 +26,7 @@ export class DiagramModificationCommandStack extends CommandStack {
     protected override isPushToUndoStack(command: ICommand): boolean {
         return !(
             command instanceof HiddenCommand ||
+            command instanceof SetUIExtensionVisibilityCommand ||
             command instanceof SelectCommand ||
             command instanceof SetViewportCommand ||
             command instanceof BringToFrontCommand ||

@@ -1,13 +1,13 @@
 import { AccordionUiExtension } from "../accordionUiExtension";
 import { UiElementFactory } from "../utils/UiElementFactory";
-import { LabelAssignment, LabelType } from "./LabelType";
+import { LabelType } from "./LabelType";
 import { inject } from "inversify";
 import { LabelTypeRegistry } from "./LabelTypeRegistry";
 
 import "./labelTypeEditorUi.css";
 import { dynamicallySetInputSize } from "../utils/TextSize";
-import { LABEL_ASSIGNMENT_MIME_TYPE } from "./dragAndDrop";
-import { AddLabelAssignmentAction } from "./assignmentCommand";
+import { LabelPlacementTool } from "./labelPlacementTool";
+import { PlacementToolRegistry } from "../touch/placementTool";
 import { IActionDispatcher, KeyListener, SModelElementImpl, TYPES } from "sprotty";
 import { SETTINGS } from "../settings/Settings";
 import { EditorModeController } from "../settings/editorMode";
@@ -18,14 +18,25 @@ import { matchesKeystroke } from "sprotty/lib/utils/keyboard";
 export class LabelTypeEditorUi extends AccordionUiExtension implements KeyListener {
     static readonly ID = "label-type-editor-ui";
     private labelSectionContainer?: HTMLElement;
+    private valueInputs = new Map<HTMLInputElement, string>();
 
     constructor(
+        @inject(LabelPlacementTool) private readonly placementTool: LabelPlacementTool,
+        @inject(PlacementToolRegistry) placements: PlacementToolRegistry,
         @inject(LabelTypeRegistry) private labelTypeRegistry: LabelTypeRegistry,
         @inject(TYPES.IActionDispatcher) private readonly actionDispatcher: IActionDispatcher,
         @inject(SETTINGS.Mode) private readonly editorModeController: EditorModeController,
     ) {
         super("left", "down");
         labelTypeRegistry.onUpdate(() => this.renderLabelTypes());
+        placements.onChange(() => {
+            for (const [input, valueId] of this.valueInputs) {
+                input.classList.toggle(
+                    "pending-assignment",
+                    this.placementTool.assignment?.labelTypeValueId === valueId,
+                );
+            }
+        });
     }
 
     id(): string {
@@ -63,6 +74,7 @@ export class LabelTypeEditorUi extends AccordionUiExtension implements KeyListen
         const height = this.labelSectionContainer.scrollHeight;
         this.labelSectionContainer.style.width = `${width}px`;
         this.labelSectionContainer.style.height = `${height}px`;
+        this.valueInputs.clear();
         const fragment = document.createDocumentFragment();
         const labelTypes = this.labelTypeRegistry.getLabelTypes();
         for (let i = 0; i < labelTypes.length; i++) {
@@ -174,19 +186,9 @@ export class LabelTypeEditorUi extends AccordionUiExtension implements KeyListen
             this.labelTypeRegistry.unregisterLabelTypeValue(labelType.id, value.id);
         };
 
-        // Allow dragging to create a label assignment
-        nameInput.draggable = true;
-        nameInput.ondragstart = (event) => {
-            if (this.editorModeController.isReadOnly()) {
-                return;
-            }
-            const assignment: LabelAssignment = {
-                labelTypeId: labelType.id,
-                labelTypeValueId: value.id,
-            };
-            const assignmentJson = JSON.stringify(assignment);
-            event.dataTransfer?.setData(LABEL_ASSIGNMENT_MIME_TYPE, assignmentJson);
-        };
+        this.valueInputs.set(nameInput, value.id);
+        nameInput.title = "Tap to choose this label, then tap a node. Tap again to cancel; double-tap to edit.";
+        nameInput.readOnly = true;
 
         // Only edit on double click
         nameInput.onclick = () => {
@@ -197,15 +199,10 @@ export class LabelTypeEditorUi extends AccordionUiExtension implements KeyListen
                 return;
             }
 
+            this.placementTool.enable({ labelTypeId: labelType.id, labelTypeValueId: value.id });
             nameInput.setAttribute("clicked", "true");
             setTimeout(() => {
                 if (nameInput.getAttribute("clicked") === "true") {
-                    this.actionDispatcher.dispatch(
-                        AddLabelAssignmentAction.create({
-                            labelTypeId: labelType.id,
-                            labelTypeValueId: value.id,
-                        }),
-                    );
                     nameInput.removeAttribute("clicked");
                 }
             }, 500);
@@ -215,6 +212,8 @@ export class LabelTypeEditorUi extends AccordionUiExtension implements KeyListen
                 return;
             }
             nameInput.removeAttribute("clicked");
+            this.placementTool.disable();
+            nameInput.readOnly = false;
             nameInput.focus();
         };
         nameInput.onfocus = (event) => {
@@ -230,6 +229,10 @@ export class LabelTypeEditorUi extends AccordionUiExtension implements KeyListen
                     nameInput.blur();
                 }, 0);
             }
+        };
+
+        nameInput.onblur = () => {
+            nameInput.readOnly = true;
         };
 
         holder.appendChild(nameInput);

@@ -2,3 +2,5 @@ node_modules
 dist
 src/helpUi/hash.json
 .vs/
+playwright-report/
+test-results/

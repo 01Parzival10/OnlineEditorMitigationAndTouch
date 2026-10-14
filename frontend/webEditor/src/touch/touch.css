@@ -1,0 +1,16 @@
+/* Only the diagram owns gestures; inputs and floating panels still scroll normally. */
+.sprotty-graph {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.label-type-value-name.pending-assignment {
+    outline: 2px solid var(--color-foreground);
+    outline-offset: 2px;
+}
+
+.label-type-value-name,
+.tool-palette .tool {
+    touch-action: manipulation;
+}

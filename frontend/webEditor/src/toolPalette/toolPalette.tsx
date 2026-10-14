@@ -19,6 +19,7 @@ import { Action } from "sprotty-protocol";
 import { NodeCreationTool } from "./nodeCreationTool";
 import { EdgeCreationTool } from "./edgeCreationTool";
 import { PortCreationTool } from "./portCreationTool";
+import { PlacementToolRegistry } from "../touch/placementTool";
 import { AnyCreationTool } from "./creationTool";
 
 import "./toolPalette.css";
@@ -38,6 +39,7 @@ export class ToolPaletteUI extends AbstractUIExtension implements IActionHandler
     constructor(
         @inject(TYPES.IActionDispatcher) protected readonly actionDispatcher: IActionDispatcher,
         @inject(TYPES.PatcherProvider) protected readonly patcherProvider: PatcherProvider,
+        @inject(PlacementToolRegistry) private readonly placements: PlacementToolRegistry,
         @inject(NodeCreationTool) protected readonly nodeCreationTool: NodeCreationTool,
         @inject(EdgeCreationTool) protected readonly edgeCreationTool: EdgeCreationTool,
         @inject(PortCreationTool) protected readonly portCreationTool: PortCreationTool,
@@ -47,6 +49,8 @@ export class ToolPaletteUI extends AbstractUIExtension implements IActionHandler
         protected readonly editorModeController: EditorModeController,
     ) {
         super();
+        placements.onChange(() => this.markAllToolsInactive());
+        editorModeController?.registerListener(() => this.disableTools());
     }
 
     id(): string {
@@ -235,6 +239,7 @@ export class ToolPaletteUI extends AbstractUIExtension implements IActionHandler
     }
 
     private disableTools(): void {
+        this.placements.cancel();
         this.allTools.forEach((tool) => tool.disable());
         this.markAllToolsInactive();
     }

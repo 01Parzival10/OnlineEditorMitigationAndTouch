@@ -28,6 +28,8 @@ import { loadingIndicatorModule } from "./loadingIndicator/di.config";
 import { keyListenerModule } from "./keyListeners/di.config";
 import { mitigationModule } from "./mitigation/di.config";
 
+import { touchModule } from "./touch/di.config";
+
 const container = new Container();
 
 // Load default sprotty provided modules
@@ -38,6 +40,7 @@ loadDefaultModules(container, {
 });
 
 container.load(
+    touchModule,
     helpUiModule,
     commonModule,
     startUpAgentModule,

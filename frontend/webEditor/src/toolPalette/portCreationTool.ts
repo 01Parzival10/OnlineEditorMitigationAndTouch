@@ -1,5 +1,12 @@
 import { injectable } from "inversify";
-import { CommitModelAction, SChildElementImpl, SModelElementImpl, SPortImpl, SShapeElementImpl } from "sprotty";
+import {
+    CommitModelAction,
+    SChildElementImpl,
+    SModelElementImpl,
+    SNodeImpl,
+    SPortImpl,
+    SShapeElementImpl,
+} from "sprotty";
 import { Action, SPort } from "sprotty-protocol";
 import { CreationTool } from "./creationTool";
 import { generateRandomSprottyId } from "../utils/idGenerator";
@@ -27,7 +34,7 @@ export class PortCreationTool extends CreationTool<SPort, SPortImpl> {
             if (currentParent !== targetNode && target instanceof SChildElementImpl) {
                 this.element.opacity = this.previewOpacity;
                 currentParent.remove(this.element);
-                target.add(this.element);
+                targetNode.add(this.element);
                 this.commandStack.update(this.element.root);
             }
         } else {
@@ -55,8 +62,8 @@ export class PortCreationTool extends CreationTool<SPort, SPortImpl> {
         return super.mouseDown(target, event);
     }
 
-    private findNodeElement(target: SModelElementImpl): SModelElementImpl | undefined {
-        if (target.type.startsWith("node")) {
+    private findNodeElement(target: SModelElementImpl): SNodeImpl | undefined {
+        if (target instanceof SNodeImpl) {
             return target;
         }
         if (target instanceof SChildElementImpl && target.parent instanceof SShapeElementImpl) {
