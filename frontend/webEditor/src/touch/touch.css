@@ -33,3 +33,9 @@
     text-anchor: middle;
     dominant-baseline: central;
 }
+
+/* Panels scroll, while pinch zoom belongs exclusively to the diagram. */
+.ui-float,
+.responsive-menu-dock {
+    touch-action: pan-x pan-y;
+}

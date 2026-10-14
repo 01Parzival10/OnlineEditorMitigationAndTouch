@@ -1,0 +1,54 @@
+.responsive-menu-dock {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    width: max-content;
+    max-width: calc(100vw - 24px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+
+.responsive-menu-dock[hidden] {
+    display: none;
+}
+
+.responsive-menu-dock > .ui-float {
+    position: relative;
+    inset: auto;
+    flex: 0 0 auto;
+    max-width: 100%;
+    max-height: none;
+    box-sizing: border-box;
+}
+
+.responsive-menu-dock .accordion-content {
+    min-width: 0;
+    max-width: 100%;
+    overflow: auto;
+}
+
+.responsive-menu-dock .accordion-content > div {
+    min-width: 0;
+}
+
+.responsive-menu-dock .help-ui p {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* Keep Run and Repair on their own row so even a phone can show both. */
+.responsive-menu-dock .constraint-menu {
+    padding-bottom: 42px;
+    min-width: min(210px, calc(100vw - 24px));
+}
+
+.responsive-menu-dock #constraint-menu-expand-title {
+    padding-right: 2em;
+}

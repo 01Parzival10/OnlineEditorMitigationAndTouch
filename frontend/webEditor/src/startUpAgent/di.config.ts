@@ -4,8 +4,11 @@ import { LoadDefaultUiExtensionsStartUpAgent } from "./LoadDefaultUiExtensions";
 import { LoadDefaultDiagramStartUpAgent } from "./LoadDefaultDiagram";
 import { SettingsInitStartUpAgent } from "./settingsInit";
 
+import { ResponsiveMenusStartUpAgent } from "./responsiveMenus";
+
 export const startUpAgentModule = new ContainerModule((bind) => {
     bind(StartUpAgent).to(LoadDefaultUiExtensionsStartUpAgent);
     bind(StartUpAgent).to(LoadDefaultDiagramStartUpAgent);
     bind(StartUpAgent).to(SettingsInitStartUpAgent);
+    bind(StartUpAgent).to(ResponsiveMenusStartUpAgent);
 });

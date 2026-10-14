@@ -1,0 +1,438 @@
+diff --git a/frontend/webEditor/TOUCH_SUPPORT.md b/frontend/webEditor/TOUCH_SUPPORT.md
+index d2ee671..3d2a257 100644
+--- a/frontend/webEditor/TOUCH_SUPPORT.md
++++ b/frontend/webEditor/TOUCH_SUPPORT.md
+@@ -28,3 +28,9 @@ npm run test:touch
+ ```
+ 
+ The browser tests use Chromium touch emulation and cover placement, assignment, pan/zoom, movement and undo, cancellation, read-only behavior, label editing, and mouse regression. Physical iOS/Android devices have not been tested.
++
++On screens where Help and Constraints would overlap, the palette, label types, mitigations, settings, help, and constraints move into a scrollable right-hand stack. Accordion state is preserved; widening the screen restores the original positions.
++
++Hold empty canvas for 550 ms to open the command palette (the same action as Ctrl+Space). Moving, adding a second finger, or cancelling the contact cancels the hold. A completed hold cancels pending placement and does not place anything on release. Holding nodes does not open the palette.
++
++Floating menus retain their viewport position and size during diagram pan/zoom. Panels allow native scrolling but do not initiate browser pinch zoom.
+diff --git a/frontend/webEditor/src/startUpAgent/di.config.ts b/frontend/webEditor/src/startUpAgent/di.config.ts
+index b71d630..4383681 100644
+--- a/frontend/webEditor/src/startUpAgent/di.config.ts
++++ b/frontend/webEditor/src/startUpAgent/di.config.ts
+@@ -4,8 +4,11 @@ import { LoadDefaultUiExtensionsStartUpAgent } from "./LoadDefaultUiExtensions";
+ import { LoadDefaultDiagramStartUpAgent } from "./LoadDefaultDiagram";
+ import { SettingsInitStartUpAgent } from "./settingsInit";
+ 
++import { ResponsiveMenusStartUpAgent } from "./responsiveMenus";
++
+ export const startUpAgentModule = new ContainerModule((bind) => {
+     bind(StartUpAgent).to(LoadDefaultUiExtensionsStartUpAgent);
+     bind(StartUpAgent).to(LoadDefaultDiagramStartUpAgent);
+     bind(StartUpAgent).to(SettingsInitStartUpAgent);
++    bind(StartUpAgent).to(ResponsiveMenusStartUpAgent);
+ });
+diff --git a/frontend/webEditor/src/startUpAgent/responsiveMenus.css b/frontend/webEditor/src/startUpAgent/responsiveMenus.css
+new file mode 100644
+index 0000000..e04201e
+--- /dev/null
++++ b/frontend/webEditor/src/startUpAgent/responsiveMenus.css
+@@ -0,0 +1,54 @@
++.responsive-menu-dock {
++    position: fixed;
++    top: max(12px, env(safe-area-inset-top));
++    right: max(12px, env(safe-area-inset-right));
++    bottom: max(12px, env(safe-area-inset-bottom));
++    z-index: 100;
++    display: flex;
++    flex-direction: column;
++    align-items: flex-end;
++    gap: 10px;
++    width: max-content;
++    max-width: calc(100vw - 24px);
++    overflow: auto;
++    overscroll-behavior: contain;
++    scrollbar-width: thin;
++}
++
++.responsive-menu-dock[hidden] {
++    display: none;
++}
++
++.responsive-menu-dock > .ui-float {
++    position: relative;
++    inset: auto;
++    flex: 0 0 auto;
++    max-width: 100%;
++    max-height: none;
++    box-sizing: border-box;
++}
++
++.responsive-menu-dock .accordion-content {
++    min-width: 0;
++    max-width: 100%;
++    overflow: auto;
++}
++
++.responsive-menu-dock .accordion-content > div {
++    min-width: 0;
++}
++
++.responsive-menu-dock .help-ui p {
++    white-space: normal;
++    overflow-wrap: anywhere;
++}
++
++/* Keep Run and Repair on their own row so even a phone can show both. */
++.responsive-menu-dock .constraint-menu {
++    padding-bottom: 42px;
++    min-width: min(210px, calc(100vw - 24px));
++}
++
++.responsive-menu-dock #constraint-menu-expand-title {
++    padding-right: 2em;
++}
+diff --git a/frontend/webEditor/src/startUpAgent/responsiveMenus.ts b/frontend/webEditor/src/startUpAgent/responsiveMenus.ts
+new file mode 100644
+index 0000000..8f61443
+--- /dev/null
++++ b/frontend/webEditor/src/startUpAgent/responsiveMenus.ts
+@@ -0,0 +1,101 @@
++import { injectable } from "inversify";
++import { IStartUpAgent } from "./StartUpAgent";
++import "./responsiveMenus.css";
++
++const menuSelectors = [
++    ".tool-palette",
++    ".label-type-editor-ui",
++    ".mitigation-options",
++    ".settings-ui",
++    ".help-ui",
++    ".constraint-menu",
++];
++
++/** Keep the existing extensions and their state; only change their layout. */
++@injectable()
++export class ResponsiveMenusStartUpAgent implements IStartUpAgent {
++    run(): void {
++        const host = document.getElementById("sprotty");
++        if (!host) return;
++        const dock = document.createElement("div");
++        dock.className = "responsive-menu-dock";
++        dock.hidden = true;
++        document.body.appendChild(dock);
++
++        const originals = new Map<HTMLElement, Comment>();
++        const observed = new Set<HTMLElement>();
++        let compact = false;
++        let returnWidth = 0;
++        let lastWidth = document.documentElement.clientWidth;
++        let frame: number | undefined;
++        const schedule = () => {
++            if (frame === undefined) frame = requestAnimationFrame(update);
++        };
++        const sizes = new ResizeObserver(schedule);
++        sizes.observe(document.documentElement);
++        window.addEventListener("resize", schedule);
++        // UI extensions are created asynchronously after the startup actions run.
++        new MutationObserver((records) => {
++            if (
++                records.some((record) =>
++                    Array.from(record.addedNodes).some(
++                        (node) =>
++                            node instanceof HTMLElement &&
++                            (node.matches(".ui-float") || node.querySelector(".ui-float")),
++                    ),
++                )
++            )
++                schedule();
++        }).observe(document.body, { childList: true, subtree: true });
++
++        const update = () => {
++            frame = undefined;
++            const menus = menuSelectors
++                .map((selector) => document.querySelector<HTMLElement>(selector))
++                .filter((menu): menu is HTMLElement => menu !== null);
++            menus.forEach((menu) => {
++                if (!observed.has(menu)) {
++                    sizes.observe(menu);
++                    observed.add(menu);
++                }
++            });
++            const help = document.querySelector<HTMLElement>(".help-ui");
++            const constraints = document.querySelector<HTMLElement>(".constraint-menu");
++            if (!help || !constraints) return;
++            const width = document.documentElement.clientWidth;
++            if (compact) {
++                // Hysteresis avoids switching back and forth as accordion sizes animate.
++                if (width > lastWidth && width >= returnWidth) {
++                    originals.forEach((placeholder, menu) => {
++                        if (placeholder.isConnected) placeholder.replaceWith(menu);
++                        else document.getElementById("sprotty")?.prepend(menu);
++                    });
++                    originals.clear();
++                    dock.hidden = true;
++                    compact = false;
++                    schedule();
++                } else {
++                    menus.forEach(moveToDock);
++                }
++            } else {
++                const left = help.getBoundingClientRect();
++                const right = constraints.getBoundingClientRect();
++                if (left.right + 12 > right.left) {
++                    returnWidth = Math.max(width + 24, left.width + right.width + 60);
++                    compact = true;
++                    dock.hidden = false;
++                    menus.forEach(moveToDock);
++                }
++            }
++            lastWidth = width;
++        };
++        const moveToDock = (menu: HTMLElement) => {
++            if (menu.parentElement === dock) return;
++            const placeholder = document.createComment("floating-menu-position");
++            menu.before(placeholder);
++            originals.set(menu, placeholder);
++            dock.appendChild(menu);
++        };
++        schedule();
++    }
++}
+diff --git a/frontend/webEditor/src/touch/touch.css b/frontend/webEditor/src/touch/touch.css
+index c33a9aa..4b52243 100644
+--- a/frontend/webEditor/src/touch/touch.css
++++ b/frontend/webEditor/src/touch/touch.css
+@@ -33,3 +33,9 @@
+     text-anchor: middle;
+     dominant-baseline: central;
+ }
++
++/* Panels scroll, while pinch zoom belongs exclusively to the diagram. */
++.ui-float,
++.responsive-menu-dock {
++    touch-action: pan-x pan-y;
++}
+diff --git a/frontend/webEditor/src/touch/touchMouseTool.ts b/frontend/webEditor/src/touch/touchMouseTool.ts
+index 2a4343d..f957b94 100644
+--- a/frontend/webEditor/src/touch/touchMouseTool.ts
++++ b/frontend/webEditor/src/touch/touchMouseTool.ts
+@@ -1,6 +1,7 @@
+ import { inject, injectable } from "inversify";
+ import { VNode } from "snabbdom";
+ import {
++    CommandPaletteKeyListener,
+     ILogger,
+     isViewport,
+     MouseEventKind,
+@@ -38,6 +39,8 @@ export class TouchMouseTool extends MouseTool {
+     private contacts = new Map<number, Contact>();
+     private start?: Contact;
+     private dragging = false;
++    private longPressTimer?: ReturnType<typeof setTimeout>;
++    private longPressed = false;
+     private multiple = false;
+     private pinch?: Pinch;
+     private lastTap?: { time: number; point: Point; elementId: string };
+@@ -94,6 +97,7 @@ export class TouchMouseTool extends MouseTool {
+         this.queue = this.queue
+             .then(() => this.handlePointer(kind, model, canvas, event.pointerId, contact))
+             .catch((error: unknown) => {
++                this.cancelLongPress();
+                 this.contacts.clear();
+                 this.start = undefined;
+                 this.dragging = false;
+@@ -121,7 +125,27 @@ export class TouchMouseTool extends MouseTool {
+                 this.start = point;
+                 this.dragging = false;
+                 this.multiple = false;
++                this.longPressed = false;
++                const target = this.getTargetElement(model, this.mouseEvent("mouseDown", canvas, point, 1));
++                if (target instanceof SModelRootImpl) {
++                    this.longPressTimer = setTimeout(() => {
++                        this.queue = this.queue
++                            .then(async () => {
++                                if (!this.start || this.multiple || this.dragging || this.contacts.size !== 1) return;
++                                this.longPressed = true;
++                                this.lastTap = undefined;
++                                this.placements.cancel();
++                                const actions = new CommandPaletteKeyListener().keyDown(
++                                    model,
++                                    new KeyboardEvent("keydown", { key: " ", code: "Space", ctrlKey: true }),
++                                );
++                                await this.actionDispatcher.dispatchAll(actions);
++                            })
++                            .catch((error: unknown) => this.logger.error(this, "Long press failed", error));
++                    }, 550);
++                }
+             } else {
++                this.cancelLongPress();
+                 // Finish any movement at the last one-finger position before zooming.
+                 if (this.dragging) {
+                     const first = this.contacts.values().next().value as Contact;
+@@ -139,8 +163,9 @@ export class TouchMouseTool extends MouseTool {
+             this.contacts.set(id, point);
+             if (this.multiple) {
+                 await this.updatePinch(model, canvas);
+-            } else if (this.start) {
++            } else if (this.start && !this.longPressed) {
+                 if (Math.hypot(point.x - this.start.x, point.y - this.start.y) > this.dragThreshold) {
++                    this.cancelLongPress();
+                     if (!this.dragging) {
+                         this.lastTap = undefined;
+                         // A placement requires a tap. A swipe must never place a new element.
+@@ -157,7 +182,8 @@ export class TouchMouseTool extends MouseTool {
+             return;
+         }
+ 
+-        if (!this.multiple) {
++        this.cancelLongPress();
++        if (!this.multiple && !this.longPressed) {
+             if (this.dragging && !this.placements.active) {
+                 // Cancellation still closes the existing move command and releases listener state.
+                 const last = kind === "pointerup" ? point : this.contacts.get(id)!;
+@@ -177,6 +203,11 @@ export class TouchMouseTool extends MouseTool {
+         }
+     }
+ 
++    private cancelLongPress(): void {
++        clearTimeout(this.longPressTimer);
++        this.longPressTimer = undefined;
++    }
++
+     private async tap(model: SModelRootImpl, canvas: Element, point: Contact): Promise<void> {
+         const placement = this.placements.active;
+         if (placement) {
+diff --git a/frontend/webEditor/tests/menus.spec.ts b/frontend/webEditor/tests/menus.spec.ts
+new file mode 100644
+index 0000000..a90daa3
+--- /dev/null
++++ b/frontend/webEditor/tests/menus.spec.ts
+@@ -0,0 +1,71 @@
++import { expect, Page, test } from "@playwright/test";
++
++async function expectStacked(page: Page) {
++    const dock = page.locator(".responsive-menu-dock");
++    await expect(dock).toBeVisible();
++    await expect(dock.locator(":scope > .ui-float")).toHaveCount(6);
++    await expect
++        .poll(() =>
++            dock.locator(":scope > .ui-float").evaluateAll((menus) => {
++                const bounds = menus.map((menu) => menu.getBoundingClientRect());
++                return bounds.every(
++                    (box, index) =>
++                        box.left >= 0 &&
++                        box.right <= window.innerWidth &&
++                        (index === 0 || box.top >= bounds[index - 1].bottom + 8),
++                );
++            }),
++        )
++        .toBe(true);
++}
++
++test("phone menus stack on the right, remain separate when expanded, and preserve state on resize", async ({
++    page,
++}) => {
++    await page.setViewportSize({ width: 375, height: 667 });
++    await page.goto("/");
++    await expectStacked(page);
++    await page.locator(".help-ui .accordion-button").tap();
++    await expect(page.locator("#help-ui-checkbox")).toBeChecked();
++    await page.locator(".constraint-menu .accordion-button").tap();
++    await expect(page.locator("#constraint-menu-checkbox")).toBeChecked();
++    await expectStacked(page);
++    await page.locator("#run-button").scrollIntoViewIfNeeded();
++    await expect(page.locator("#run-button")).toBeInViewport();
++    await expect(page.locator("#repair-button")).toBeInViewport();
++    await page.setViewportSize({ width: 2000, height: 1000 });
++    await expect(page.locator(".responsive-menu-dock")).toBeHidden();
++    await expect(page.locator("#help-ui-checkbox")).toBeChecked();
++    await expect(page.locator("#constraint-menu-checkbox")).toBeChecked();
++    const help = await page.locator(".help-ui").boundingBox();
++    const constraints = await page.locator(".constraint-menu").boundingBox();
++    expect(help!.x + help!.width).toBeLessThan(constraints!.x);
++    await page.setViewportSize({ width: 375, height: 667 });
++    await expectStacked(page);
++});
++
++test("opening menus on a medium screen triggers docking when their measured widths collide", async ({ page }) => {
++    await page.setViewportSize({ width: 1000, height: 750 });
++    await page.goto("/");
++    await expect(page.locator(".help-ui")).toBeVisible();
++    await expect(page.locator(".responsive-menu-dock")).toBeHidden();
++    await page.locator(".help-ui .accordion-button").tap();
++    await page.locator(".constraint-menu .accordion-button").tap();
++    await expectStacked(page);
++});
++
++test("narrow landscape and 320px portrait keep all six menus reachable", async ({ page }) => {
++    await page.setViewportSize({ width: 600, height: 320 });
++    await page.goto("/");
++    await expectStacked(page);
++    await page.locator(".constraint-menu .accordion-button").scrollIntoViewIfNeeded();
++    await expect(page.locator(".constraint-menu .accordion-button")).toBeInViewport();
++    await page.setViewportSize({ width: 320, height: 568 });
++    await expectStacked(page);
++    await page.locator(".constraint-menu .accordion-button").tap();
++    await expectStacked(page);
++    await page.locator("#run-button").scrollIntoViewIfNeeded();
++    await expect(page.locator("#repair-button")).toBeInViewport();
++    await page.locator(".tool-palette").scrollIntoViewIfNeeded();
++    await expect(page.locator(".tool-palette")).toBeInViewport();
++});
+diff --git a/frontend/webEditor/tests/touch.spec.ts b/frontend/webEditor/tests/touch.spec.ts
+index ffd5d14..d13a98c 100644
+--- a/frontend/webEditor/tests/touch.spec.ts
++++ b/frontend/webEditor/tests/touch.spec.ts
+@@ -262,3 +262,55 @@ test("read-only pins and flows have no delete buttons", async ({ page }) => {
+         .tap();
+     await expect(page.locator(".flow-delete")).toHaveCount(0);
+ });
++
++test("background long press opens Ctrl+Space palette without placing a node", async ({ page }) => {
++    await palette(page, 2).tap();
++    const session = await page.context().newCDPSession(page);
++    await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 450, y: 180 }] });
++    await expect(page.locator(".command-palette input")).toBeVisible();
++    await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
++    await expect(nodes(page)).toHaveCount(7);
++    await expect(palette(page, 2)).not.toHaveClass(/active/);
++    await session.detach();
++});
++
++test("long press is cancelled by movement and does not open on nodes", async ({ page }) => {
++    const session = await page.context().newCDPSession(page);
++    const at = await center(node(page, "view").locator("text.sprotty-label"));
++    await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [at] });
++    await page.waitForTimeout(700);
++    await expect(page.locator(".command-palette input")).not.toBeVisible();
++    await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
++    await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 450, y: 180 }] });
++    await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: 490, y: 200 }] });
++    await page.waitForTimeout(700);
++    await expect(page.locator(".command-palette input")).not.toBeVisible();
++    await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
++    await session.detach();
++});
++
++test("pinch zoom changes only the diagram and keeps floating menus fixed", async ({ page }) => {
++    const menus = page.locator(".ui-float");
++    const boxes = () =>
++        menus.evaluateAll((elements) =>
++            elements.map((e) => {
++                const { x, y, width, height } = e.getBoundingClientRect();
++                return { x, y, width, height };
++            }),
++        );
++    const before = await boxes();
++    const diagram = await transform(page);
++    await gesture(page, [
++        [
++            { x: 350, y: 150, id: 1 },
++            { x: 550, y: 150, id: 2 },
++        ],
++        [
++            { x: 300, y: 150, id: 1 },
++            { x: 600, y: 150, id: 2 },
++        ],
++    ]);
++    await expect.poll(() => transform(page)).not.toBe(diagram);
++    expect(await boxes()).toEqual(before);
++    expect(await page.evaluate(() => window.visualViewport?.scale)).toBe(1);
++});

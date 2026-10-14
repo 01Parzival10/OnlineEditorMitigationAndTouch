@@ -262,3 +262,55 @@ test("read-only pins and flows have no delete buttons", async ({ page }) => {
         .tap();
     await expect(page.locator(".flow-delete")).toHaveCount(0);
 });
+
+test("background long press opens Ctrl+Space palette without placing a node", async ({ page }) => {
+    await palette(page, 2).tap();
+    const session = await page.context().newCDPSession(page);
+    await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 450, y: 180 }] });
+    await expect(page.locator(".command-palette input")).toBeVisible();
+    await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect(nodes(page)).toHaveCount(7);
+    await expect(palette(page, 2)).not.toHaveClass(/active/);
+    await session.detach();
+});
+
+test("long press is cancelled by movement and does not open on nodes", async ({ page }) => {
+    const session = await page.context().newCDPSession(page);
+    const at = await center(node(page, "view").locator("text.sprotty-label"));
+    await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [at] });
+    await page.waitForTimeout(700);
+    await expect(page.locator(".command-palette input")).not.toBeVisible();
+    await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 450, y: 180 }] });
+    await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: 490, y: 200 }] });
+    await page.waitForTimeout(700);
+    await expect(page.locator(".command-palette input")).not.toBeVisible();
+    await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await session.detach();
+});
+
+test("pinch zoom changes only the diagram and keeps floating menus fixed", async ({ page }) => {
+    const menus = page.locator(".ui-float");
+    const boxes = () =>
+        menus.evaluateAll((elements) =>
+            elements.map((e) => {
+                const { x, y, width, height } = e.getBoundingClientRect();
+                return { x, y, width, height };
+            }),
+        );
+    const before = await boxes();
+    const diagram = await transform(page);
+    await gesture(page, [
+        [
+            { x: 350, y: 150, id: 1 },
+            { x: 550, y: 150, id: 2 },
+        ],
+        [
+            { x: 300, y: 150, id: 1 },
+            { x: 600, y: 150, id: 2 },
+        ],
+    ]);
+    await expect.poll(() => transform(page)).not.toBe(diagram);
+    expect(await boxes()).toEqual(before);
+    expect(await page.evaluate(() => window.visualViewport?.scale)).toBe(1);
+});

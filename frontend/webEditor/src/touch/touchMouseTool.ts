@@ -1,6 +1,7 @@
 import { inject, injectable } from "inversify";
 import { VNode } from "snabbdom";
 import {
+    CommandPaletteKeyListener,
     ILogger,
     isViewport,
     MouseEventKind,
@@ -38,6 +39,8 @@ export class TouchMouseTool extends MouseTool {
     private contacts = new Map<number, Contact>();
     private start?: Contact;
     private dragging = false;
+    private longPressTimer?: ReturnType<typeof setTimeout>;
+    private longPressed = false;
     private multiple = false;
     private pinch?: Pinch;
     private lastTap?: { time: number; point: Point; elementId: string };
@@ -94,6 +97,7 @@ export class TouchMouseTool extends MouseTool {
         this.queue = this.queue
             .then(() => this.handlePointer(kind, model, canvas, event.pointerId, contact))
             .catch((error: unknown) => {
+                this.cancelLongPress();
                 this.contacts.clear();
                 this.start = undefined;
                 this.dragging = false;
@@ -121,7 +125,27 @@ export class TouchMouseTool extends MouseTool {
                 this.start = point;
                 this.dragging = false;
                 this.multiple = false;
+                this.longPressed = false;
+                const target = this.getTargetElement(model, this.mouseEvent("mouseDown", canvas, point, 1));
+                if (target instanceof SModelRootImpl) {
+                    this.longPressTimer = setTimeout(() => {
+                        this.queue = this.queue
+                            .then(async () => {
+                                if (!this.start || this.multiple || this.dragging || this.contacts.size !== 1) return;
+                                this.longPressed = true;
+                                this.lastTap = undefined;
+                                this.placements.cancel();
+                                const actions = new CommandPaletteKeyListener().keyDown(
+                                    model,
+                                    new KeyboardEvent("keydown", { key: " ", code: "Space", ctrlKey: true }),
+                                );
+                                await this.actionDispatcher.dispatchAll(actions);
+                            })
+                            .catch((error: unknown) => this.logger.error(this, "Long press failed", error));
+                    }, 550);
+                }
             } else {
+                this.cancelLongPress();
                 // Finish any movement at the last one-finger position before zooming.
                 if (this.dragging) {
                     const first = this.contacts.values().next().value as Contact;
@@ -139,8 +163,9 @@ export class TouchMouseTool extends MouseTool {
             this.contacts.set(id, point);
             if (this.multiple) {
                 await this.updatePinch(model, canvas);
-            } else if (this.start) {
+            } else if (this.start && !this.longPressed) {
                 if (Math.hypot(point.x - this.start.x, point.y - this.start.y) > this.dragThreshold) {
+                    this.cancelLongPress();
                     if (!this.dragging) {
                         this.lastTap = undefined;
                         // A placement requires a tap. A swipe must never place a new element.
@@ -157,7 +182,8 @@ export class TouchMouseTool extends MouseTool {
             return;
         }
 
-        if (!this.multiple) {
+        this.cancelLongPress();
+        if (!this.multiple && !this.longPressed) {
             if (this.dragging && !this.placements.active) {
                 // Cancellation still closes the existing move command and releases listener state.
                 const last = kind === "pointerup" ? point : this.contacts.get(id)!;
@@ -175,6 +201,11 @@ export class TouchMouseTool extends MouseTool {
         } else if (this.multiple) {
             this.beginPinch(model);
         }
+    }
+
+    private cancelLongPress(): void {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = undefined;
     }
 
     private async tap(model: SModelRootImpl, canvas: Element, point: Contact): Promise<void> {
