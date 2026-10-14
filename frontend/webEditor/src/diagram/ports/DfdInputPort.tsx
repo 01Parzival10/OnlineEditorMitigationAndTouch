@@ -1,11 +1,12 @@
 /** @jsx svg */
-import { injectable } from "inversify";
+import { inject, injectable } from "inversify";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { svg, SRoutableElementImpl, ShapeView, SPortImpl, RenderingContext } from "sprotty";
 import { SPort } from "sprotty-protocol";
 import { ArrowEdgeImpl } from "../edges/ArrowEdge";
 import { DfdPortImpl } from "./common";
 import { VNode } from "snabbdom";
+import { DeleteButtonRenderer } from "../deleteButton";
 
 export type DfdInputPort = SPort;
 
@@ -43,6 +44,8 @@ export class DfdInputPortImpl extends DfdPortImpl {
 }
 
 export class DfdInputPortView extends ShapeView {
+    @inject(DeleteButtonRenderer) private readonly deleteButton!: DeleteButtonRenderer;
+
     render(node: Readonly<SPortImpl>, context: RenderingContext): VNode | undefined {
         if (!this.isVisible(node, context)) {
             return undefined;
@@ -57,6 +60,7 @@ export class DfdInputPortView extends ShapeView {
                     I
                 </text>
                 {context.renderChildren(node)}
+                {this.deleteButton.render(node, { x: width + 7, y: -8 }, "pin")}
             </g>
         );
     }

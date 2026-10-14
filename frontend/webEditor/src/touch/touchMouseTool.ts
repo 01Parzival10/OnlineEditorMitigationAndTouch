@@ -18,6 +18,9 @@ import { PlacementToolRegistry } from "./placementTool";
 import { SETTINGS } from "../settings/Settings";
 import { EditorModeController } from "../settings/editorMode";
 
+import { DfdOutputPortImpl } from "../diagram/ports/DfdOutputPort";
+import { OutputPortEditUIMouseListener } from "../assignment/clickListener";
+
 type Contact = { x: number; y: number; target: Element };
 type Pinch = { distance: number; center: Point; viewport: Viewport };
 
@@ -188,6 +191,12 @@ export class TouchMouseTool extends MouseTool {
             await this.send("mouseDown", model, canvas, point, 1, [placement]);
             return;
         }
+        // SVG buttons own the tap. Do not turn it into a selection/double-tap edit.
+        if (point.target.closest(".element-delete, .label-delete")) {
+            this.lastTap = undefined;
+            point.target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+            return;
+        }
         const target = this.getTargetElement(model, this.mouseEvent("mouseDown", canvas, point, 1));
         await this.send("mouseDown", model, canvas, point, 1);
         await this.send("mouseUp", model, canvas, point, 0);
@@ -195,6 +204,18 @@ export class TouchMouseTool extends MouseTool {
             new MouseEvent("click", { bubbles: true, cancelable: true, clientX: point.x, clientY: point.y }),
         );
         if (!target) return;
+        if (target instanceof DfdOutputPortImpl) {
+            this.lastTap = undefined;
+            await this.send(
+                "doubleClick",
+                model,
+                canvas,
+                point,
+                0,
+                this.mouseListeners.filter((listener) => listener instanceof OutputPortEditUIMouseListener),
+            );
+            return;
+        }
         const now = Date.now();
         if (
             this.lastTap &&

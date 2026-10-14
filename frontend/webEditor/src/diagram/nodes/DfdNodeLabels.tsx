@@ -1,6 +1,6 @@
 /** @jsx svg */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { IActionDispatcher, SNodeImpl, svg, TYPES } from "sprotty";
+import { CommitModelAction, IActionDispatcher, SNodeImpl, svg, TYPES } from "sprotty";
 import { LabelAssignment, LabelType, LabelTypeValue } from "../../labels/LabelType";
 import { inject, injectable } from "inversify";
 import { LabelTypeRegistry } from "../../labels/LabelTypeRegistry";
@@ -8,6 +8,10 @@ import { calculateTextSize } from "../../utils/TextSize";
 import { VNode } from "snabbdom";
 import { ContainsDfdLabels } from "../../labels/feature";
 import { RemoveLabelAssignmentAction } from "../../labels/assignmentCommand";
+
+import { DeleteButtonRenderer } from "../deleteButton";
+import { SETTINGS } from "../../settings/Settings";
+import { EditorModeController } from "../../settings/editorMode";
 
 @injectable()
 export class DfdNodeLabelSizeCalculator {
@@ -53,6 +57,8 @@ export class DfdNodeLabelSizeCalculator {
 export class DfdNodeLabelRenderer extends DfdNodeLabelSizeCalculator {
     constructor(
         @inject(TYPES.IActionDispatcher) private readonly actionDispatcher: IActionDispatcher,
+        @inject(DeleteButtonRenderer) private readonly deleteButton: DeleteButtonRenderer,
+        @inject(SETTINGS.Mode) private readonly mode: EditorModeController,
         @inject(LabelTypeRegistry) labelTypeRegistry: LabelTypeRegistry,
     ) {
         super(labelTypeRegistry);
@@ -65,8 +71,13 @@ export class DfdNodeLabelRenderer extends DfdNodeLabelSizeCalculator {
         const height = DfdNodeLabelRenderer.LABEL_HEIGHT;
         const radius = height / 2;
 
-        const deleteLabelHandler = () => {
-            this.actionDispatcher.dispatch(RemoveLabelAssignmentAction.create(label, node));
+        const deleteLabelHandler = (event: MouseEvent) => {
+            event.stopPropagation();
+            if (this.mode.isReadOnly()) return;
+            this.actionDispatcher.dispatchAll([
+                RemoveLabelAssignmentAction.create(label, node),
+                CommitModelAction.create(),
+            ]);
         };
 
         return (
@@ -77,7 +88,7 @@ export class DfdNodeLabelRenderer extends DfdNodeLabelSizeCalculator {
                 </text>
                 {
                     // Put a x button to delete the element on the right upper edge
-                    node.hoverFeedback ? (
+                    !this.mode.isReadOnly() && (node.hoverFeedback || node.selected) ? (
                         <g class-label-delete={true} on={{ click: deleteLabelHandler }}>
                             <circle cx={xRight} cy={y} r={radius * 0.8}></circle>
                             <text x={xRight} y={y}>
@@ -88,6 +99,10 @@ export class DfdNodeLabelRenderer extends DfdNodeLabelSizeCalculator {
                 }
             </g>
         );
+    }
+
+    renderNodeDeleteButton(node: SNodeImpl): VNode | undefined {
+        return this.deleteButton.render(node, { x: node.bounds.width, y: 0 }, "node");
     }
 
     /**

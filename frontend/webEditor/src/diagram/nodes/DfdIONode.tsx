@@ -41,6 +41,7 @@ export class IONodeView extends ShapeView {
                     yPosition: IONodeImpl.TEXT_HEIGHT / 2,
                 } as DfdPositionalLabelArgs)}
                 {this.labelRenderer.renderNodeLabels(node, IONodeImpl.LABEL_START_HEIGHT)}
+                {this.labelRenderer.renderNodeDeleteButton(node)}
             </g>
         );
     }

@@ -35,8 +35,11 @@ import {
 } from "./ports/portSnapper";
 import { DfdNodeAnnotationUI, DfdNodeAnnotationUIMouseListener } from "./nodes/annotation";
 
+import { DeleteButtonRenderer } from "./deleteButton";
+
 export const diagramModule = new ContainerModule((bind, unbind, isBound, rebind) => {
     const context = { bind, unbind, isBound, rebind };
+    bind(DeleteButtonRenderer).toSelf().inSingletonScope();
 
     bind(TYPES.IEditLabelValidator).to(DfdEditLabelValidator).inSingletonScope();
     bind(TYPES.IEditLabelValidationDecorator).to(DfdEditLabelValidatorDecorator).inSingletonScope();

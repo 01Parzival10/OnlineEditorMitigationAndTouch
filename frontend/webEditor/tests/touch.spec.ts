@@ -157,3 +157,108 @@ test("mouse creation and dragging still work", async ({ page }) => {
     await page.mouse.up();
     await expect(target).not.toHaveAttribute("transform", before!);
 });
+
+test("selected nodes expose delete controls, remove connected edges and support undo", async ({ page }) => {
+    for (const name of ["view", "User", "Database"]) {
+        const target = node(page, name);
+        const edgeCount = await page.locator("svg.sprotty-graph .sprotty-edge").count();
+        await target.locator("text.sprotty-label").tap();
+        await expect(target.locator(".node-delete")).toBeVisible();
+        await target.locator(".node-delete").tap();
+        await expect(nodes(page)).toHaveCount(6);
+        expect(await page.locator("svg.sprotty-graph .sprotty-edge").count()).toBeLessThan(edgeCount);
+        await page.keyboard.press("Control+z");
+        await expect(nodes(page)).toHaveCount(7);
+        await expect(page.locator("svg.sprotty-graph .sprotty-edge")).toHaveCount(edgeCount);
+    }
+});
+
+test("tapping an assigned label reveals its X and deletes only that label", async ({ page }) => {
+    const target = node(page, "User");
+    await target.locator(".node-label > text").tap();
+    await expect(target.locator(".label-delete")).toBeVisible();
+    await target.locator(".label-delete").tap();
+    await expect(target.locator(".node-label")).toHaveCount(0);
+    await expect(nodes(page)).toHaveCount(7);
+    await page.keyboard.press("Control+z");
+    await expect(target.locator(".node-label")).toHaveCount(1);
+});
+
+test("one output-port tap opens assignments, dragging does not", async ({ page }) => {
+    const output = node(page, "view")
+        .locator(".sprotty-port")
+        .filter({ has: page.locator(".port-text", { hasText: /^O$/ }) });
+    await output.locator(".port-text").tap();
+    await expect(page.locator(".assignment-edit-ui")).toBeVisible();
+    await page.touchscreen.tap(450, 180);
+    await expect(page.locator(".assignment-edit-ui")).not.toBeVisible();
+    await drag(page, await center(output.locator(":scope > rect")), 0, 25);
+    await expect(page.locator(".assignment-edit-ui")).not.toBeVisible();
+    await output.locator(".port-text").tap();
+    await expect(page.locator(".assignment-edit-ui")).toBeVisible();
+});
+
+test("read-only selection exposes no delete controls", async ({ page }) => {
+    await page.locator(".settings-ui .accordion-button").tap();
+    await page.locator("label:has(#setting-read-only)").tap();
+    await node(page, "User").locator(".node-label > text").tap();
+    await expect(page.locator(".node-delete, .label-delete")).toHaveCount(0);
+});
+
+test("input and output pin deletion removes connected flows and undo restores them", async ({ page }) => {
+    for (const direction of ["I", "O"]) {
+        const target = node(page, "view");
+        const pin = target
+            .locator(".sprotty-port")
+            .filter({ has: page.locator(".port-text", { hasText: new RegExp(`^${direction}$`) }) });
+        const pinId = await pin.getAttribute("id");
+        const pinCount = await target.locator(".sprotty-port").count();
+        const flowCount = await page.locator("svg.sprotty-graph .sprotty-edge").count();
+        await pin.locator(".port-text").tap();
+        await expect(pin.locator(".pin-delete")).toBeVisible();
+        await pin.locator(".pin-delete").tap();
+        await expect(target.locator(".sprotty-port")).toHaveCount(pinCount - 1);
+        await expect(page.locator("svg.sprotty-graph .sprotty-edge")).toHaveCount(flowCount - 1);
+        await expect(nodes(page)).toHaveCount(7);
+        await expect(page.locator(".assignment-edit-ui")).not.toBeVisible();
+        await page.keyboard.press("Control+z");
+        await expect(page.locator(`[id="${pinId}"]`)).toBeVisible();
+        await expect(target.locator(".sprotty-port")).toHaveCount(pinCount);
+        await expect(page.locator("svg.sprotty-graph .sprotty-edge")).toHaveCount(flowCount);
+    }
+});
+
+test("flow deletion preserves endpoints and can be undone", async ({ page }) => {
+    const flows = page.locator("svg.sprotty-graph .sprotty-edge");
+    const flow = flows.filter({ has: page.locator("text.sprotty-label", { hasText: /^request$/ }) }).first();
+    const flowId = await flow.getAttribute("id");
+    const before = await flows.count();
+    const pins = page.locator("svg.sprotty-graph .sprotty-port");
+    const pinCount = await pins.count();
+    await flow.locator("text.sprotty-label").tap();
+    const selectedFlow = page.locator(`[id="${flowId}"]`);
+    await expect(selectedFlow.locator(".flow-delete")).toBeVisible();
+    await selectedFlow.locator(".flow-delete").tap();
+    await expect(flows).toHaveCount(before - 1);
+    await expect(pins).toHaveCount(pinCount);
+    await expect(nodes(page)).toHaveCount(7);
+    await page.keyboard.press("Control+z");
+    await expect(page.locator(`[id="${flowId}"]`)).toBeVisible();
+    await expect(flows).toHaveCount(before);
+});
+
+test("read-only pins and flows have no delete buttons", async ({ page }) => {
+    await page.locator(".settings-ui .accordion-button").tap();
+    await page.locator("label:has(#setting-read-only)").tap();
+    const pin = node(page, "view")
+        .locator(".sprotty-port")
+        .filter({ has: page.locator(".port-text", { hasText: /^I$/ }) });
+    await pin.locator(".port-text").tap();
+    await expect(page.locator(".pin-delete")).toHaveCount(0);
+    await page
+        .locator(".sprotty-edge text.sprotty-label")
+        .filter({ hasText: /^request$/ })
+        .first()
+        .tap();
+    await expect(page.locator(".flow-delete")).toHaveCount(0);
+});

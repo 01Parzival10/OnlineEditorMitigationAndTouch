@@ -48,6 +48,7 @@ export class StorageNodeView extends ShapeView {
                     yPosition: StorageNodeImpl.TEXT_HEIGHT / 2,
                 } as DfdPositionalLabelArgs)}
                 {this.labelRenderer.renderNodeLabels(node, StorageNodeImpl.LABEL_START_HEIGHT, leftPadding)}
+                {this.labelRenderer.renderNodeDeleteButton(node)}
             </g>
         );
     }

@@ -34,9 +34,9 @@ export class HelpUI extends AccordionUiExtension {
             <p><kbd>CTRL</kbd>+<kbd>C</kbd>: Copy selected elements</p>
             <p><kbd>CTRL</kbd>+<kbd>V</kbd>: Paste previously copied elements</p>
             <p><kbd>Esc</kbd>: Disable current creation tool</p>
-            <p>Touch: tap to select; drag existing elements to move them.</p>
+            <p>Touch: tap to select; drag existing elements to move them. Tap X to delete a selected node, pin, flow, or assigned label.</p>
             <p>Drag empty canvas to pan. Use two fingers to pan or pinch to zoom.</p>
-            <p>Double-tap a label or output port to edit.</p>
+            <p>Double-tap a diagram label to edit. Tap an output port to edit its assignments.</p>
             <p>Tap a creation tool, then tap its location. For edges, tap source then target.</p>
             <p>Tap a label value, then its target node. Tap the value again to cancel.</p>
             <p>Toggle Creation Tool: Refer to key in the tool palette</p>

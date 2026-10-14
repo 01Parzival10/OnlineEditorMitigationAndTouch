@@ -5,6 +5,7 @@ import { svg, isEditableLabel, SRoutableElementImpl, ShapeView, RenderingContext
 import { SPort } from "sprotty-protocol";
 import { DfdPortImpl } from "./common";
 import { VNode, VNodeStyle } from "snabbdom";
+import { DeleteButtonRenderer } from "../deleteButton";
 import { LabelTypeRegistry } from "../../labels/LabelTypeRegistry";
 import { LanguageTreeNode, tokenize } from "../../languages/tokenize";
 import { verify, VerifyWord } from "../../languages/verify";
@@ -84,6 +85,8 @@ export class DfdOutputPortImpl extends DfdPortImpl {
 
 @injectable()
 export class DfdOutputPortView extends ShapeView {
+    @inject(DeleteButtonRenderer) private readonly deleteButton!: DeleteButtonRenderer;
+
     render(node: Readonly<DfdOutputPortImpl>, context: RenderingContext): VNode | undefined {
         if (!this.isVisible(node, context)) {
             return undefined;
@@ -98,6 +101,7 @@ export class DfdOutputPortView extends ShapeView {
                     O
                 </text>
                 {context.renderChildren(node)}
+                {this.deleteButton.render(node, { x: width + 7, y: -8 }, "pin")}
             </g>
         );
     }

@@ -16,9 +16,11 @@ import "./assignmentEditUi.css";
 import { EditorModeController } from "../settings/editorMode";
 import { matchesKeystroke } from "sprotty/lib/utils/keyboard";
 
+import { ASSIGNMENT_EDIT_UI_ID } from "./id";
+
 @injectable()
 export class AssignmentEditUi extends AbstractUIExtension {
-    public static readonly ID = "assignment-edit-ui";
+    public static readonly ID = ASSIGNMENT_EDIT_UI_ID;
 
     private port?: DfdOutputPortImpl;
     private tree?: LanguageTreeNode<Word>[];

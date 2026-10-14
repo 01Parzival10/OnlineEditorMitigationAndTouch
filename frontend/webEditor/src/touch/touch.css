@@ -14,3 +14,22 @@
 .tool-palette .tool {
     touch-action: manipulation;
 }
+
+.element-delete,
+.sprotty-node .label-delete {
+    cursor: pointer;
+}
+
+.element-delete circle {
+    fill: var(--color-primary);
+    stroke: var(--color-foreground);
+    stroke-width: 0.5;
+}
+
+.element-delete text {
+    fill: var(--color-foreground);
+    stroke: none;
+    font: 7px sans-serif;
+    text-anchor: middle;
+    dominant-baseline: central;
+}

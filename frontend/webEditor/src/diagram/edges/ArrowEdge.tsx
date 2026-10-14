@@ -15,6 +15,8 @@ import { VNode } from "snabbdom";
 import { Point, angleOfPoint, toDegrees, SEdge } from "sprotty-protocol";
 import { HideEdgeNames, SETTINGS } from "../../settings/Settings";
 
+import { DeleteButtonRenderer } from "../deleteButton";
+
 export interface ArrowEdge extends SEdge {
     text?: string;
 }
@@ -34,6 +36,7 @@ export class ArrowEdgeImpl extends SEdgeImpl implements WithEditableLabel {
 
 @injectable()
 export class ArrowEdgeView extends PolylineEdgeViewWithGapsOnIntersections {
+    @inject(DeleteButtonRenderer) private readonly deleteButton!: DeleteButtonRenderer;
     constructor(@inject(SETTINGS.HideEdgeNames) private readonly hideEdgeNames: HideEdgeNames) {
         super();
     }
@@ -94,6 +97,23 @@ export class ArrowEdgeView extends PolylineEdgeViewWithGapsOnIntersections {
         );
     }
 
+    /** Position above the halfway point along the routed polyline, including bends. */
+    private deleteButtonPosition(route: Point[]): Point {
+        const lengths = route.slice(1).map((point, i) => Math.hypot(point.x - route[i].x, point.y - route[i].y));
+        let remaining = lengths.reduce((sum, length) => sum + length, 0) / 2;
+        for (let i = 0; i < lengths.length; i++) {
+            if (lengths[i] > 0 && remaining <= lengths[i]) {
+                const ratio = remaining / lengths[i];
+                return {
+                    x: route[i].x + ratio * (route[i + 1].x - route[i].x),
+                    y: route[i].y + ratio * (route[i + 1].y - route[i].y) - 14,
+                };
+            }
+            remaining -= lengths[i];
+        }
+        return { x: route[0].x, y: route[0].y - 14 };
+    }
+
     override render(edge: Readonly<SEdgeImpl>, context: RenderingContext, args?: IViewArgs): VNode | undefined {
         // In the default implementation children of the edge are always rendered, because they
         // may be visible when the rest of the edge is not.
@@ -114,6 +134,7 @@ export class ArrowEdgeView extends PolylineEdgeViewWithGapsOnIntersections {
                 {this.renderAdditionals(edge, route, context)}
                 {this.renderJunctionPoints(edge, route, context, args)}
                 {this.hideEdgeNames.get() ? undefined : context.renderChildren(edge, { route })}
+                {this.deleteButton.render(edge, this.deleteButtonPosition(route), "flow")}
             </g>
         );
     }

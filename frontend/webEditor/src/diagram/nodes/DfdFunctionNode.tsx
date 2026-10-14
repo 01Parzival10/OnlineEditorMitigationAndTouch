@@ -45,6 +45,7 @@ export class FunctionNodeView extends ShapeView {
                     yPosition: FunctionNodeImpl.TEXT_HEIGHT / 2,
                 } as DfdPositionalLabelArgs)}
                 {this.labelRenderer.renderNodeLabels(node, FunctionNodeImpl.LABEL_START_HEIGHT)}
+                {this.labelRenderer.renderNodeDeleteButton(node)}
             </g>
         );
     }

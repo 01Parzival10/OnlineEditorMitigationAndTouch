@@ -30,7 +30,12 @@ export class DeleteKeyListener extends KeyListener {
                 .filter((e) => e.id !== e.root.id), // Deleting the model root would be a bad idea
         );
 
-        const deleteElementIds = selectedElements.flatMap((e) => {
+        return this.deleteElements(selectedElements);
+    }
+
+    /** Shared by the keyboard and the per-node delete button. */
+    deleteElements(elements: SModelElementImpl[]): Action[] {
+        const deleteElementIds = elements.flatMap((e) => {
             const ids = [e.id];
 
             if (e instanceof SConnectableElementImpl) {
