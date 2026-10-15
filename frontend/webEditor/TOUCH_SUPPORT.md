@@ -36,3 +36,5 @@ Hold empty canvas for 550 ms to open the command palette (the same action as Ctr
 Floating menus retain their viewport position and size during diagram pan/zoom. Panels allow native scrolling but do not initiate browser pinch zoom.
 
 Command palette folders expand on tap or click without losing search focus; choosing a child executes it and closes the palette.
+
+In stacked-menu mode the command palette is a bottom panel sized to the visible viewport. Folder entries expand above their heading, with scrolling on short screens and 44px touch targets. Normal desktop positioning returns when the menus are no longer stacked.

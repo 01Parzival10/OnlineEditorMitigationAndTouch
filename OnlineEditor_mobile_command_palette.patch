@@ -1,0 +1,167 @@
+diff --git a/frontend/webEditor/TOUCH_SUPPORT.md b/frontend/webEditor/TOUCH_SUPPORT.md
+index ed45673..663501e 100644
+--- a/frontend/webEditor/TOUCH_SUPPORT.md
++++ b/frontend/webEditor/TOUCH_SUPPORT.md
+@@ -36,3 +36,5 @@ Hold empty canvas for 550 ms to open the command palette (the same action as Ctr
+ Floating menus retain their viewport position and size during diagram pan/zoom. Panels allow native scrolling but do not initiate browser pinch zoom.
+ 
+ Command palette folders expand on tap or click without losing search focus; choosing a child executes it and closes the palette.
++
++In stacked-menu mode the command palette is a bottom panel sized to the visible viewport. Folder entries expand above their heading, with scrolling on short screens and 44px touch targets. Normal desktop positioning returns when the menus are no longer stacked.
+diff --git a/frontend/webEditor/src/commandPalette/commandPalette.css b/frontend/webEditor/src/commandPalette/commandPalette.css
+index 6d77c39..3a78652 100644
+--- a/frontend/webEditor/src/commandPalette/commandPalette.css
++++ b/frontend/webEditor/src/commandPalette/commandPalette.css
+@@ -56,3 +56,61 @@
+ .command-palette .fa-solid {
+     text-align: center;
+ }
++
++/* In the stacked layout, grow the palette and folder contents upward. */
++.menus-stacked .command-palette {
++    position: fixed !important;
++    top: auto !important;
++    left: max(12px, env(safe-area-inset-left)) !important;
++    right: max(12px, env(safe-area-inset-right));
++    bottom: calc(var(--palette-bottom, 0px) + max(12px, env(safe-area-inset-bottom)));
++    width: auto !important;
++    max-height: calc(var(--palette-height, 100dvh) - 24px);
++    box-sizing: border-box;
++    overflow: auto;
++    overscroll-behavior: contain;
++    z-index: 1000;
++    flex-direction: column-reverse;
++    background: var(--color-primary);
++    touch-action: pan-y;
++}
++
++.menus-stacked .command-palette input {
++    box-sizing: border-box;
++    min-height: 44px;
++    font-size: 16px;
++    flex-shrink: 0;
++}
++
++.menus-stacked .command-palette-suggestion {
++    grid-template-columns: 24px minmax(0, 1fr) 24px;
++    height: auto;
++    min-height: 44px;
++    white-space: normal;
++    box-sizing: border-box;
++    align-items: center;
++}
++
++.menus-stacked .command-palette-suggestion > span {
++    grid-row: 2;
++    padding-block: 12px;
++}
++
++.menus-stacked .command-palette-suggestion > .codicon-chevron-right {
++    transform: rotate(-90deg);
++}
++
++.menus-stacked .command-palette-suggestion-children {
++    position: static;
++    grid-column: 1 / -1;
++    grid-row: 1;
++    width: 100%;
++    box-sizing: border-box;
++    border-left: 0;
++    border-bottom: 2px solid var(--color-spacer);
++}
++
++/* Touch uses explicit expansion, not the browser's sticky hover state. */
++.menus-stacked .command-palette-suggestion:hover:not(.expanded) > .command-palette-suggestion-children {
++    display: none;
++}
+diff --git a/frontend/webEditor/src/commandPalette/commandPalette.ts b/frontend/webEditor/src/commandPalette/commandPalette.ts
+index dddc693..57abe57 100644
+--- a/frontend/webEditor/src/commandPalette/commandPalette.ts
++++ b/frontend/webEditor/src/commandPalette/commandPalette.ts
+@@ -20,6 +20,17 @@ export class WebEditorCommandPalette extends CommandPalette {
+         containerElement.style.position = "absolute";
+         containerElement.style.top = "100px";
+         containerElement.style.left = "100px";
++        // Keep the bottom sheet above the mobile keyboard's visual viewport.
++        const updateVisibleViewport = () => {
++            const viewport = window.visualViewport;
++            containerElement.style.setProperty("--palette-height", `${viewport?.height ?? window.innerHeight}px`);
++            const bottom = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
++            containerElement.style.setProperty("--palette-bottom", `${bottom}px`);
++        };
++        window.visualViewport?.addEventListener("resize", updateVisibleViewport);
++        window.visualViewport?.addEventListener("scroll", updateVisibleViewport);
++        window.addEventListener("resize", updateVisibleViewport);
++        updateVisibleViewport();
+         this.inputElement = document.createElement("input");
+         this.inputElement.style.width = "100%";
+         this.inputElement.addEventListener("keydown", (event) => this.processKeyStrokeInInput(event));
+diff --git a/frontend/webEditor/src/startUpAgent/responsiveMenus.ts b/frontend/webEditor/src/startUpAgent/responsiveMenus.ts
+index 8f61443..0b7f3cd 100644
+--- a/frontend/webEditor/src/startUpAgent/responsiveMenus.ts
++++ b/frontend/webEditor/src/startUpAgent/responsiveMenus.ts
+@@ -73,6 +73,7 @@ export class ResponsiveMenusStartUpAgent implements IStartUpAgent {
+                     originals.clear();
+                     dock.hidden = true;
+                     compact = false;
++                    document.body.classList.remove("menus-stacked");
+                     schedule();
+                 } else {
+                     menus.forEach(moveToDock);
+@@ -83,6 +84,7 @@ export class ResponsiveMenusStartUpAgent implements IStartUpAgent {
+                 if (left.right + 12 > right.left) {
+                     returnWidth = Math.max(width + 24, left.width + right.width + 60);
+                     compact = true;
++                    document.body.classList.add("menus-stacked");
+                     dock.hidden = false;
+                     menus.forEach(moveToDock);
+                 }
+diff --git a/frontend/webEditor/tests/menus.spec.ts b/frontend/webEditor/tests/menus.spec.ts
+index a6330e7..5708ed3 100644
+--- a/frontend/webEditor/tests/menus.spec.ts
++++ b/frontend/webEditor/tests/menus.spec.ts
+@@ -101,3 +101,44 @@ test("empty space below and between stacked panels passes touches to the diagram
+     await expect(diagram).not.toHaveAttribute("transform", before!);
+     await session.detach();
+ });
++
++for (const viewport of [
++    { width: 375, height: 667 },
++    { width: 600, height: 320 },
++]) {
++    test(`stacked command palette opens at bottom with upward folders at ${viewport.width}px`, async ({ page }) => {
++        await page.setViewportSize(viewport);
++        await page.goto("/");
++        await expectStacked(page);
++        await page.touchscreen.tap(20, 250);
++        await page.keyboard.press("Control+Space");
++        const palette = page.locator(".command-palette");
++        await expect(palette).toBeVisible();
++        const bounds = await palette.boundingBox();
++        expect(bounds!.x).toBeGreaterThanOrEqual(0);
++        expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
++        expect(Math.abs(bounds!.y + bounds!.height - (viewport.height - 12))).toBeLessThan(2);
++        const save = palette
++            .locator(".command-palette-suggestions-holder > .command-palette-suggestion")
++            .filter({ has: page.locator(":scope > .command-palette-suggestion-label", { hasText: /^Save$/ }) });
++        const heading = save.locator(":scope > .command-palette-suggestion-label");
++        await heading.tap();
++        const children = save.locator(".command-palette-suggestion-children");
++        await expect(children).toBeVisible();
++        const childBounds = await children.boundingBox();
++        const parentBounds = await heading.boundingBox();
++        expect(childBounds!.y + childBounds!.height).toBeLessThanOrEqual(parentBounds!.y + 1);
++        const child = children.getByText("Save diagram as JSON", { exact: true });
++        await child.scrollIntoViewIfNeeded();
++        await expect(child).toBeInViewport();
++        const download = page.waitForEvent("download");
++        await child.tap();
++        await download;
++        await expect(palette).toBeHidden();
++        await page.setViewportSize({ width: 2000, height: 1000 });
++        await expect(page.locator("body")).not.toHaveClass(/menus-stacked/);
++        await page.touchscreen.tap(20, 250);
++        await page.keyboard.press("Control+Space");
++        await expect(palette).toHaveCSS("position", "absolute");
++    });
++}

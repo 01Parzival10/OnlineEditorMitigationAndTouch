@@ -20,6 +20,17 @@ export class WebEditorCommandPalette extends CommandPalette {
         containerElement.style.position = "absolute";
         containerElement.style.top = "100px";
         containerElement.style.left = "100px";
+        // Keep the bottom sheet above the mobile keyboard's visual viewport.
+        const updateVisibleViewport = () => {
+            const viewport = window.visualViewport;
+            containerElement.style.setProperty("--palette-height", `${viewport?.height ?? window.innerHeight}px`);
+            const bottom = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
+            containerElement.style.setProperty("--palette-bottom", `${bottom}px`);
+        };
+        window.visualViewport?.addEventListener("resize", updateVisibleViewport);
+        window.visualViewport?.addEventListener("scroll", updateVisibleViewport);
+        window.addEventListener("resize", updateVisibleViewport);
+        updateVisibleViewport();
         this.inputElement = document.createElement("input");
         this.inputElement.style.width = "100%";
         this.inputElement.addEventListener("keydown", (event) => this.processKeyStrokeInInput(event));

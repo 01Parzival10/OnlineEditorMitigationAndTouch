@@ -73,6 +73,7 @@ export class ResponsiveMenusStartUpAgent implements IStartUpAgent {
                     originals.clear();
                     dock.hidden = true;
                     compact = false;
+                    document.body.classList.remove("menus-stacked");
                     schedule();
                 } else {
                     menus.forEach(moveToDock);
@@ -83,6 +84,7 @@ export class ResponsiveMenusStartUpAgent implements IStartUpAgent {
                 if (left.right + 12 > right.left) {
                     returnWidth = Math.max(width + 24, left.width + right.width + 60);
                     compact = true;
+                    document.body.classList.add("menus-stacked");
                     dock.hidden = false;
                     menus.forEach(moveToDock);
                 }

@@ -101,3 +101,44 @@ test("empty space below and between stacked panels passes touches to the diagram
     await expect(diagram).not.toHaveAttribute("transform", before!);
     await session.detach();
 });
+
+for (const viewport of [
+    { width: 375, height: 667 },
+    { width: 600, height: 320 },
+]) {
+    test(`stacked command palette opens at bottom with upward folders at ${viewport.width}px`, async ({ page }) => {
+        await page.setViewportSize(viewport);
+        await page.goto("/");
+        await expectStacked(page);
+        await page.touchscreen.tap(20, 250);
+        await page.keyboard.press("Control+Space");
+        const palette = page.locator(".command-palette");
+        await expect(palette).toBeVisible();
+        const bounds = await palette.boundingBox();
+        expect(bounds!.x).toBeGreaterThanOrEqual(0);
+        expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
+        expect(Math.abs(bounds!.y + bounds!.height - (viewport.height - 12))).toBeLessThan(2);
+        const save = palette
+            .locator(".command-palette-suggestions-holder > .command-palette-suggestion")
+            .filter({ has: page.locator(":scope > .command-palette-suggestion-label", { hasText: /^Save$/ }) });
+        const heading = save.locator(":scope > .command-palette-suggestion-label");
+        await heading.tap();
+        const children = save.locator(".command-palette-suggestion-children");
+        await expect(children).toBeVisible();
+        const childBounds = await children.boundingBox();
+        const parentBounds = await heading.boundingBox();
+        expect(childBounds!.y + childBounds!.height).toBeLessThanOrEqual(parentBounds!.y + 1);
+        const child = children.getByText("Save diagram as JSON", { exact: true });
+        await child.scrollIntoViewIfNeeded();
+        await expect(child).toBeInViewport();
+        const download = page.waitForEvent("download");
+        await child.tap();
+        await download;
+        await expect(palette).toBeHidden();
+        await page.setViewportSize({ width: 2000, height: 1000 });
+        await expect(page.locator("body")).not.toHaveClass(/menus-stacked/);
+        await page.touchscreen.tap(20, 250);
+        await page.keyboard.press("Control+Space");
+        await expect(palette).toHaveCSS("position", "absolute");
+    });
+}

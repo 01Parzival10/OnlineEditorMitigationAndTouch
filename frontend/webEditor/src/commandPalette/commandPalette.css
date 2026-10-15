@@ -56,3 +56,61 @@
 .command-palette .fa-solid {
     text-align: center;
 }
+
+/* In the stacked layout, grow the palette and folder contents upward. */
+.menus-stacked .command-palette {
+    position: fixed !important;
+    top: auto !important;
+    left: max(12px, env(safe-area-inset-left)) !important;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: calc(var(--palette-bottom, 0px) + max(12px, env(safe-area-inset-bottom)));
+    width: auto !important;
+    max-height: calc(var(--palette-height, 100dvh) - 24px);
+    box-sizing: border-box;
+    overflow: auto;
+    overscroll-behavior: contain;
+    z-index: 1000;
+    flex-direction: column-reverse;
+    background: var(--color-primary);
+    touch-action: pan-y;
+}
+
+.menus-stacked .command-palette input {
+    box-sizing: border-box;
+    min-height: 44px;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.menus-stacked .command-palette-suggestion {
+    grid-template-columns: 24px minmax(0, 1fr) 24px;
+    height: auto;
+    min-height: 44px;
+    white-space: normal;
+    box-sizing: border-box;
+    align-items: center;
+}
+
+.menus-stacked .command-palette-suggestion > span {
+    grid-row: 2;
+    padding-block: 12px;
+}
+
+.menus-stacked .command-palette-suggestion > .codicon-chevron-right {
+    transform: rotate(-90deg);
+}
+
+.menus-stacked .command-palette-suggestion-children {
+    position: static;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+    box-sizing: border-box;
+    border-left: 0;
+    border-bottom: 2px solid var(--color-spacer);
+}
+
+/* Touch uses explicit expansion, not the browser's sticky hover state. */
+.menus-stacked .command-palette-suggestion:hover:not(.expanded) > .command-palette-suggestion-children {
+    display: none;
+}
