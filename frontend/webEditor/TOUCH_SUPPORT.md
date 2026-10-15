@@ -29,8 +29,10 @@ npm run test:touch
 
 The browser tests use Chromium touch emulation and cover placement, assignment, pan/zoom, movement and undo, cancellation, read-only behavior, label editing, and mouse regression. Physical iOS/Android devices have not been tested.
 
-On screens where Help and Constraints would overlap, the palette, label types, mitigations, settings, help, and constraints move into a scrollable right-hand stack. Accordion state is preserved; widening the screen restores the original positions.
+On screens where Help and Constraints would overlap, the palette, label types, mitigations, settings, help, and constraints move into a scrollable right-hand stack. The Keyboard Shortcuts / Help panel is hidden while stacked. Empty space between and below panels passes input through to the diagram. Accordion state is preserved; widening the screen restores the original positions and Help panel.
 
 Hold empty canvas for 550 ms to open the command palette (the same action as Ctrl+Space). Moving, adding a second finger, or cancelling the contact cancels the hold. A completed hold cancels pending placement and does not place anything on release. Holding nodes does not open the palette.
 
 Floating menus retain their viewport position and size during diagram pan/zoom. Panels allow native scrolling but do not initiate browser pinch zoom.
+
+Command palette folders expand on tap or click without losing search focus; choosing a child executes it and closes the palette.

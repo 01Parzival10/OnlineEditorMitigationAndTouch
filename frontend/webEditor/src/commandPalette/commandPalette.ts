@@ -24,9 +24,14 @@ export class WebEditorCommandPalette extends CommandPalette {
         this.inputElement.style.width = "100%";
         this.inputElement.addEventListener("keydown", (event) => this.processKeyStrokeInInput(event));
         this.inputElement.addEventListener("input", () => this.updateSuggestions());
-        this.inputElement.onblur = () => window.setTimeout(() => this.hide(), 200);
+        this.inputElement.onblur = () =>
+            window.setTimeout(() => {
+                if (!containerElement.contains(document.activeElement)) this.hide();
+            }, 200);
         this.suggestionElement = document.createElement("div");
         this.suggestionElement.className = "command-palette-suggestions-holder";
+        // Keep the search input focused while tapping/clicking a folder or its children.
+        this.suggestionElement.addEventListener("pointerdown", (event) => event.preventDefault());
         containerElement.appendChild(this.inputElement);
         containerElement.appendChild(this.suggestionElement);
     }
@@ -109,9 +114,17 @@ export class WebEditorCommandPalette extends CommandPalette {
             }
             suggestion.appendChild(childHolder);
         }
-        suggestion.addEventListener("click", () => {
-            if (!(action instanceof FolderAction)) {
+        suggestion.addEventListener("click", (event) => {
+            event.stopPropagation();
+            if (action instanceof FolderAction) {
+                const expanded = suggestion.classList.contains("expanded");
+                this.index = expanded ? -1 : this.filteredActions.indexOf(action);
+                this.insideChild = false;
+                this.childIndex = -1;
+                this.updateSuggestions();
+            } else {
                 this.executeAction(action);
+                this.hide();
             }
         });
         return suggestion;

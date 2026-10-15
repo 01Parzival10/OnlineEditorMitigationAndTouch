@@ -314,3 +314,29 @@ test("pinch zoom changes only the diagram and keeps floating menus fixed", async
     expect(await boxes()).toEqual(before);
     expect(await page.evaluate(() => window.visualViewport?.scale)).toBe(1);
 });
+
+for (const interaction of ["tap", "click"] as const) {
+    test(`command palette folders stay open for child selection with ${interaction}`, async ({ page }) => {
+        await page.touchscreen.tap(450, 180);
+        await page.keyboard.press("Control+Space");
+        const input = page.locator(".command-palette input");
+        await expect(input).toBeVisible();
+        const save = page
+            .locator(".command-palette-suggestions-holder > .command-palette-suggestion")
+            .filter({ has: page.locator(":scope > .command-palette-suggestion-label", { hasText: /^Save$/ }) });
+        await save.locator(":scope > .command-palette-suggestion-label")[interaction]();
+        await page.waitForTimeout(350);
+        await expect(input).toBeVisible();
+        await expect(input).toBeFocused();
+        const child = save.locator(".command-palette-suggestion-label", { hasText: "Save diagram as JSON" });
+        await expect(child).toBeVisible();
+        const download = page.waitForEvent("download");
+        await child[interaction]();
+        await download;
+        await expect(input).not.toBeVisible();
+        await page.keyboard.press("Control+Space");
+        await expect(input).toBeVisible();
+        await page.touchscreen.tap(450, 180);
+        await expect(input).not.toBeVisible();
+    });
+}

@@ -1,5 +1,6 @@
 .responsive-menu-dock {
     position: fixed;
+    pointer-events: none;
     top: max(12px, env(safe-area-inset-top));
     right: max(12px, env(safe-area-inset-right));
     bottom: max(12px, env(safe-area-inset-bottom));
@@ -21,6 +22,7 @@
 
 .responsive-menu-dock > .ui-float {
     position: relative;
+    pointer-events: auto;
     inset: auto;
     flex: 0 0 auto;
     max-width: 100%;
@@ -51,4 +53,9 @@
 
 .responsive-menu-dock #constraint-menu-expand-title {
     padding-right: 2em;
+}
+
+/* Shortcuts are available in the normal layout, but take no space in the dock. */
+.responsive-menu-dock > .help-ui {
+    display: none;
 }
