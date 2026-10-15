@@ -1,0 +1,93 @@
+diff --git a/frontend/webEditor/TOUCH_SUPPORT.md b/frontend/webEditor/TOUCH_SUPPORT.md
+index 663501e..fcf68f4 100644
+--- a/frontend/webEditor/TOUCH_SUPPORT.md
++++ b/frontend/webEditor/TOUCH_SUPPORT.md
+@@ -35,6 +35,6 @@ Hold empty canvas for 550 ms to open the command palette (the same action as Ctr
+ 
+ Floating menus retain their viewport position and size during diagram pan/zoom. Panels allow native scrolling but do not initiate browser pinch zoom.
+ 
+-Command palette folders expand on tap or click without losing search focus; choosing a child executes it and closes the palette.
++Command palette folders expand on tap or click. Input blur (including mobile keyboard dismissal) does not close the palette; an outside pointer interaction, moving focus to another control, Escape, or choosing a command closes it.
+ 
+ In stacked-menu mode the command palette is a bottom panel sized to the visible viewport. Folder entries expand above their heading, with scrolling on short screens and 44px touch targets. Normal desktop positioning returns when the menus are no longer stacked.
+diff --git a/frontend/webEditor/src/commandPalette/commandPalette.ts b/frontend/webEditor/src/commandPalette/commandPalette.ts
+index 57abe57..9e10275 100644
+--- a/frontend/webEditor/src/commandPalette/commandPalette.ts
++++ b/frontend/webEditor/src/commandPalette/commandPalette.ts
+@@ -35,14 +35,17 @@ export class WebEditorCommandPalette extends CommandPalette {
+         this.inputElement.style.width = "100%";
+         this.inputElement.addEventListener("keydown", (event) => this.processKeyStrokeInInput(event));
+         this.inputElement.addEventListener("input", () => this.updateSuggestions());
+-        this.inputElement.onblur = () =>
+-            window.setTimeout(() => {
+-                if (!containerElement.contains(document.activeElement)) this.hide();
+-            }, 200);
++        // Mobile browsers may blur the input when a folder expands or the keyboard
++        // closes. Dismiss only for an actual interaction outside the palette.
++        const dismissOutside = (event: Event) => {
++            if (containerElement.style.visibility === "visible" && !event.composedPath().includes(containerElement)) {
++                this.hide();
++            }
++        };
++        document.addEventListener("pointerdown", dismissOutside, true);
++        document.addEventListener("focusin", dismissOutside, true);
+         this.suggestionElement = document.createElement("div");
+         this.suggestionElement.className = "command-palette-suggestions-holder";
+-        // Keep the search input focused while tapping/clicking a folder or its children.
+-        this.suggestionElement.addEventListener("pointerdown", (event) => event.preventDefault());
+         containerElement.appendChild(this.inputElement);
+         containerElement.appendChild(this.suggestionElement);
+     }
+diff --git a/frontend/webEditor/tests/menus.spec.ts b/frontend/webEditor/tests/menus.spec.ts
+index 5708ed3..57d7927 100644
+--- a/frontend/webEditor/tests/menus.spec.ts
++++ b/frontend/webEditor/tests/menus.spec.ts
+@@ -142,3 +142,35 @@ for (const viewport of [
+         await expect(palette).toHaveCSS("position", "absolute");
+     });
+ }
++
++test("stacked palette survives input blur before and after folder expansion", async ({ page }) => {
++    await page.setViewportSize({ width: 375, height: 667 });
++    await page.goto("/");
++    await expectStacked(page);
++    await page.touchscreen.tap(20, 250);
++    await page.keyboard.press("Control+Space");
++    const palette = page.locator(".command-palette");
++    const input = palette.locator("input");
++    await expect(input).toBeVisible();
++    // Reproduce browsers dismissing the software keyboard before delivering the tap.
++    await input.evaluate((element) => element.blur());
++    await page.waitForTimeout(350);
++    await expect(palette).toBeVisible();
++    const save = palette
++        .locator(".command-palette-suggestions-holder > .command-palette-suggestion")
++        .filter({ has: page.locator(":scope > .command-palette-suggestion-label", { hasText: /^Save$/ }) });
++    await save.locator(":scope > .command-palette-suggestion-label").tap();
++    await input.focus();
++    await input.evaluate((element) => element.blur());
++    await page.waitForTimeout(350);
++    await expect(palette).toBeVisible();
++    const download = page.waitForEvent("download");
++    await save.getByText("Save diagram as JSON", { exact: true }).tap();
++    await download;
++    await expect(palette).toBeHidden();
++    await page.touchscreen.tap(20, 250);
++    await page.keyboard.press("Control+Space");
++    await expect(palette).toBeVisible();
++    await page.touchscreen.tap(20, 20);
++    await expect(palette).toBeHidden();
++});
+diff --git a/frontend/webEditor/tests/touch.spec.ts b/frontend/webEditor/tests/touch.spec.ts
+index 86f5d89..65827c7 100644
+--- a/frontend/webEditor/tests/touch.spec.ts
++++ b/frontend/webEditor/tests/touch.spec.ts
+@@ -327,7 +327,7 @@ for (const interaction of ["tap", "click"] as const) {
+         await save.locator(":scope > .command-palette-suggestion-label")[interaction]();
+         await page.waitForTimeout(350);
+         await expect(input).toBeVisible();
+-        await expect(input).toBeFocused();
++
+         const child = save.locator(".command-palette-suggestion-label", { hasText: "Save diagram as JSON" });
+         await expect(child).toBeVisible();
+         const download = page.waitForEvent("download");

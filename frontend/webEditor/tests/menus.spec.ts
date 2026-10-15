@@ -142,3 +142,35 @@ for (const viewport of [
         await expect(palette).toHaveCSS("position", "absolute");
     });
 }
+
+test("stacked palette survives input blur before and after folder expansion", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto("/");
+    await expectStacked(page);
+    await page.touchscreen.tap(20, 250);
+    await page.keyboard.press("Control+Space");
+    const palette = page.locator(".command-palette");
+    const input = palette.locator("input");
+    await expect(input).toBeVisible();
+    // Reproduce browsers dismissing the software keyboard before delivering the tap.
+    await input.evaluate((element) => element.blur());
+    await page.waitForTimeout(350);
+    await expect(palette).toBeVisible();
+    const save = palette
+        .locator(".command-palette-suggestions-holder > .command-palette-suggestion")
+        .filter({ has: page.locator(":scope > .command-palette-suggestion-label", { hasText: /^Save$/ }) });
+    await save.locator(":scope > .command-palette-suggestion-label").tap();
+    await input.focus();
+    await input.evaluate((element) => element.blur());
+    await page.waitForTimeout(350);
+    await expect(palette).toBeVisible();
+    const download = page.waitForEvent("download");
+    await save.getByText("Save diagram as JSON", { exact: true }).tap();
+    await download;
+    await expect(palette).toBeHidden();
+    await page.touchscreen.tap(20, 250);
+    await page.keyboard.press("Control+Space");
+    await expect(palette).toBeVisible();
+    await page.touchscreen.tap(20, 20);
+    await expect(palette).toBeHidden();
+});

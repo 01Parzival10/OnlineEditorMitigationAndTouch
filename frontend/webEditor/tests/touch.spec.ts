@@ -327,7 +327,7 @@ for (const interaction of ["tap", "click"] as const) {
         await save.locator(":scope > .command-palette-suggestion-label")[interaction]();
         await page.waitForTimeout(350);
         await expect(input).toBeVisible();
-        await expect(input).toBeFocused();
+
         const child = save.locator(".command-palette-suggestion-label", { hasText: "Save diagram as JSON" });
         await expect(child).toBeVisible();
         const download = page.waitForEvent("download");

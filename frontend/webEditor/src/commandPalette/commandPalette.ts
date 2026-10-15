@@ -35,14 +35,17 @@ export class WebEditorCommandPalette extends CommandPalette {
         this.inputElement.style.width = "100%";
         this.inputElement.addEventListener("keydown", (event) => this.processKeyStrokeInInput(event));
         this.inputElement.addEventListener("input", () => this.updateSuggestions());
-        this.inputElement.onblur = () =>
-            window.setTimeout(() => {
-                if (!containerElement.contains(document.activeElement)) this.hide();
-            }, 200);
+        // Mobile browsers may blur the input when a folder expands or the keyboard
+        // closes. Dismiss only for an actual interaction outside the palette.
+        const dismissOutside = (event: Event) => {
+            if (containerElement.style.visibility === "visible" && !event.composedPath().includes(containerElement)) {
+                this.hide();
+            }
+        };
+        document.addEventListener("pointerdown", dismissOutside, true);
+        document.addEventListener("focusin", dismissOutside, true);
         this.suggestionElement = document.createElement("div");
         this.suggestionElement.className = "command-palette-suggestions-holder";
-        // Keep the search input focused while tapping/clicking a folder or its children.
-        this.suggestionElement.addEventListener("pointerdown", (event) => event.preventDefault());
         containerElement.appendChild(this.inputElement);
         containerElement.appendChild(this.suggestionElement);
     }
